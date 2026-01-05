@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Controlador de Estoque — Modern</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    :root{
+      --bg:#0a0e27; --panel:#151b35; --card:#1a2038; --accent:#00d4ff; --muted:#8b92b0; --white:#f0f4f8; --success:#10b981; --danger:#ef4444; --glass: rgba(255,255,255,0.05); --glass-border: rgba(255,255,255,0.1);
+      --radius:16px; --radius-sm:12px; --accent-glow: rgba(0, 212, 255, 0.3); --shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    *{box-sizing:border-box;font-family:'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--white);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+    .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh;gap:28px;padding:32px;position:relative;z-index:1}
+    .sidebar{background: linear-gradient(180deg, rgba(21, 27, 53, 0.7), rgba(15, 19, 40, 0.9));backdrop-filter: blur(20px);border:1px solid var(--glass-border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:20px;position:sticky;top:32px;height:fit-content;max-height:calc(100vh - 64px);overflow-y:auto}
+    .brand{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--glass-border)}
+    .logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#a78bfa);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#0a0e27;box-shadow:0 8px 24px var(--accent-glow)}
+    .app-title{font-weight:800;font-size:18px}
+    .nav{display:flex;flex-direction:column;gap:6px}
+    .nav button{background:transparent;border:none;color:var(--muted);padding:14px 16px;border-radius:var(--radius-sm);text-align:left;cursor:pointer;font-weight:600;font-size:15px;transition:all .25s}
+    .nav button.active{background:linear-gradient(90deg, rgba(0,212,255,0.06), rgba(167,139,250,0.04));color:var(--white);box-shadow:0 4px 12px rgba(0,212,255,0.06)}
+    .content{padding:28px;border-radius:var(--radius);background:linear-gradient(180deg, rgba(26,32,56,0.4), rgba(21,27,53,0.3));backdrop-filter:blur(20px);border:1px solid var(--glass-border);box-shadow:var(--shadow)}
+    header.app-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--glass-border)}
+    .search-input{background:var(--glass);border:1px solid var(--glass-border);padding:12px 20px;border-radius:var(--radius-sm);color:var(--white);min-width:320px}
+    .btn{background:linear-gradient(135deg,var(--accent),#00a8cc);border:none;color:#0a0e27;padding:12px 24px;border-radius:var(--radius-sm);cursor:pointer;font-weight:700}
+    .btn.ghost{background:transparent;color:var(--white);border:1px solid var(--glass-border)}
+    .card{background:linear-gradient(135deg, rgba(26, 32, 56, 0.6), rgba(21, 27, 53, 0.4));border:1px solid var(--glass-border);padding:24px;border-radius:var(--radius);margin-bottom:20px}
+    .grid-2{display:grid;grid-template-columns:1fr 400px;gap:24px}
+    .small{font-size:13px;color:var(--muted)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px;text-align:left;border-bottom:1px solid var(--glass-border);font-size:14px;color:var(--white)}
+    th{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;background:var(--glass);position:sticky;top:0}
+    input,select{background:var(--glass);border:1px solid var(--glass-border);color:var(--white);padding:10px;border-radius:var(--radius-sm)}
+    .pill{background:var(--glass);border:1px solid var(--glass-border);padding:18px;border-radius:var(--radius-sm)}
+    .summary-row{display:flex;gap:16px;flex-wrap:wrap}
+    .summary-item{min-width:160px;flex:1}
+    .chart-wrap{height:240px;position:relative}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(10,14,39,0.8);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:100}
+    .modal{background:linear-gradient(135deg,var(--card),var(--panel));border:1px solid var(--glass-border);padding:28px;border-radius:var(--radius);width:580px;max-width:90vw}
+    .form-row{display:flex;gap:12px}
+    .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;text-transform:uppercase}
+    .badge-success{background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.15)}
+    .badge-danger{background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.15)}
+    @media (max-width:1000px){.app{grid-template-columns:1fr;padding:20px}.sidebar{position:relative;order:2;display:flex;flex-direction:row;overflow-x:auto}.nav{flex-direction:row}.content{padding:20px}.search-input{min-width:200px}}
+  </style>
+</head>
+<body>
+  <!-- LOGIN PAGE -->
+  <div id="login-page" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:var(--bg);z-index:5">
+    <div id="login-box" style="width:520px;max-width:90vw;background:linear-gradient(135deg, rgba(26,32,56,0.9), rgba(15,19,40,0.95));padding:32px;border-radius:16px;border:1px solid var(--glass-border);box-shadow:0 30px 80px rgba(0,0,0,0.6);color:var(--white)">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#a78bfa);display:flex;align-items:center;justify-content:center;font-weight:800;color:#0a0e27">L</div>
+        <div>
+          <h2 style="margin:0;font-size:24px">Sistema de Estoque</h2>
+          <div class="small muted">Área administrativa — insira suas credenciais</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <input id="loginUser" placeholder="Usuário" autocomplete="username" />
+        <input id="loginPass" type="password" placeholder="Senha" autocomplete="current-password" />
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <label style="display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px"><input id="remember" type="checkbox"> Lembrar</label>
+          <div style="display:flex;gap:12px">
+            <button class="btn ghost" id="demoBtn" title="Entrar com demo">Demo</button>
+            <button class="btn" id="loginBtn">Entrar</button>
+          </div>
+        </div>
+        <div class="help-text" style="margin-top:8px;color:var(--muted)">Credenciais padrão: <strong>jplupas</strong> / <strong>1234@</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app-root" class="app" style="display:none">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">JP</div>
+        <div>
+          <div class="app-title">jp lupas</div>
+          <div class="small muted">Painel Administrativo</div>
+        </div>
+      </div>
+
+      <nav class="nav" role="navigation" aria-label="Main navigation">
+        <button data-page="dashboard" class="active">📊 Dashboard</button>
+        <button data-page="estoque">📦 Estoque</button>
+        <button data-page="vendas">💰 Vendas</button>
+        <button data-page="relatorios">📈 Relatórios</button>
+      </nav>
+
+      <div style="margin-top:auto;padding-top:20px;border-top:1px solid var(--glass-border)">
+        <div class="small muted" style="margin-bottom:12px">Exportar Dados</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="exportStockBtnSide" class="btn ghost">📤 Exportar Estoque</button>
+          <button id="exportSalesBtnSide" class="btn ghost">📤 Exportar Vendas</button>
+          <button id="clearBtnSide" class="btn ghost">🔄 Resetar vendas/gastos</button>
+          <button id="logoutBtn" class="btn ghost" style="margin-top:8px">🚪 Logout</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="content" role="main">
+      <header class="app-header">
+        <div style="display:flex;align-items:center;gap:16px;flex:1">
+          <input id="globalSearch" class="search-input" placeholder="🔍 Buscar produto, cor, tamanho, vendas..." />
+          <div class="small muted" style="margin-left:12px">👤 Usuário: <strong id="currentUser">-</strong></div>
+        </div>
+        <div style="display:flex;gap:12px" class="top-actions">
+          <button id="newProductBtn" class="btn">✨ Novo Produto</button>
+        </div>
+      </header>
+
+      <!-- PAGES -->
+      <section id="page-dashboard">
+        <div class="grid-2">
+          <div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+                <div>
+                  <div class="small muted">RESUMO RÁPIDO</div>
+                  <h3 style="margin:8px 0 0 0">Visão Geral do Negócio</h3>
+                </div>
+                <div class="small muted">📅 Últimas 24h</div>
+              </div>
+
+              <div class="summary-row">
+                <div class="pill summary-item">
+                  <div class="small muted">Peças em estoque</div>
+                  <div id="totalPecas" style="font-weight:800;font-size:28px;margin-top:8px">0</div>
+                </div>
+                <div class="pill summary-item">
+                  <div class="small muted">Total Investido</div>
+                  <div id="totalInvestido" style="font-weight:800;font-size:28px;margin-top:8px">R$ 0,00</div>
+                </div>
+                <div class="pill summary-item">
+                  <div class="small muted">Faturamento Real</div>
+                  <div id="faturamentoReal" style="font-weight:800;font-size:28px;margin-top:8px">R$ 0,00</div>
+                </div>
+                <div class="pill summary-item">
+                  <div class="small muted">Lucro Líquido</div>
+                  <div id="lucroReal" style="font-weight:800;font-size:28px;margin-top:8px">R$ 0,00</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h4 style="margin:0 0 16px 0">💹 Fluxo de Caixa</h4>
+              <div class="chart-wrap"><canvas id="grafPizza"></canvas></div>
+              <div id="resumoPizza" style="margin-top:16px" class="small muted"></div>
+            </div>
+
+            <div class="card">
+              <h4 style="margin:0 0 16px 0">🏆 Produtos Mais Vendidos</h4>
+              <ul id="rankingProdutos" style="padding-left:20px;margin:0" class="small"></ul>
+            </div>
+          </div>
+
+          <aside>
+            <div class="card">
+              <h4 style="margin:0 0 16px 0">⚡ Venda Rápida</h4>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <label class="small muted">PRODUTO</label>
+                <select id="quickProduto"></select>
+                <div style="display:flex;gap:12px">
+                  <div style="flex:1">
+                    <label class="small muted">QUANTIDADE</label>
+                    <input id="quickQtd" type="number" min="1" value="1" style="width:100%;margin-top:6px" />
+                  </div>
+                  <div style="flex:1">
+                    <label class="small muted">VALOR (R$)</label>
+                    <input id="quickValor" type="number" min="0" step="0.01" placeholder="0,00" style="width:100%;margin-top:6px" />
+                  </div>
+                </div>
+                <button id="quickAddBtn" class="btn" style="margin-top:8px">💳 Registrar Venda</button>
+                <div class="small muted" style="margin-top:4px">✓ Venda rápida — subtrai do estoque automaticamente</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h4 style="margin:0 0 16px 0">💸 Registrar Gastos</h4>
+              <form id="gastoFormSide" style="display:flex;flex-direction:column;gap:12px">
+                <input id="gastoDescSide" placeholder="Descrição do gasto" />
+                <input id="gastoValorSide" type="number" min="0" step="0.01" placeholder="Valor (R$)" />
+                <button type="submit" class="btn ghost">➕ Adicionar Gasto</button>
+              </form>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ESTOQUE PAGE -->
+      <section id="page-estoque" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">📦 Gestão de Estoque</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="filterStock" placeholder="🔍 Buscar no estoque..." />
+            <select id="filterTamanho"><option value="">Todos tamanhos</option><option>M</option><option>G</option><option>GG</option></select>
+            <button id="newProductBtn2" class="btn">✨ Novo</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="overflow:auto;max-height:420px">
+            <table id="stockTable">
+              <thead>
+                <tr><th>Modelo</th><th>Cor</th><th>Tamanho</th><th>Qtd</th><th>Custo</th><th>Preço</th><th>Lucro/unid</th><th>Ações</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VENDAS PAGE -->
+      <section id="page-vendas" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">Vendas (Histórico)</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="filterSales" placeholder="Buscar vendas..." />
+            <select id="filterEstorno"><option value="all">Todos</option><option value="active">Ativas</option><option value="estornado">Estornadas</option></select>
+            <button id="exportSalesBtnTop" class="btn ghost">Exportar CSV</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="overflow:auto;max-height:520px">
+            <table id="salesTable">
+              <thead><tr><th>Data</th><th>Produto</th><th>Qtd</th><th>Valor total</th><th>Lucro</th><th>Ação</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- RELATÓRIOS PAGE -->
+      <section id="page-relatorios" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">Relatórios</h3>
+          <div class="small muted">Exportar / Analisar</div>
+        </div>
+
+        <div class="card">
+          <h4>Resumo Financeiro</h4>
+          <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+            <div class="pill"><div class="small muted">Faturamento realizado</div><div id="rel_faturamento" style="font-weight:700">R$ 0,00</div></div>
+            <div class="pill"><div class="small muted">Gastos</div><div id="rel_gastos" style="font-weight:700">R$ 0,00</div></div>
+            <div class="pill"><div class="small muted">Custo produtos vendidos</div><div id="rel_custos" style="font-weight:700">R$ 0,00</div></div>
+            <div class="pill"><div class="small muted">Lucro líquido</div><div id="rel_lucro" style="font-weight:700">R$ 0,00</div></div>
+          </div>
+          <div style="margin-top:12px">
+            <button id="exportPdfBtn" class="btn ghost">Exportar PDF (simulado)</button>
+            <button id="exportXlsxBtn" class="btn ghost">Exportar XLSX (simulado)</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modal-root" style="display:none"></div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+  /***************************
+   * Unified Inventory App (final)
+   ***************************/
+  const STORAGE_KEYS = { stock: 'loja_stock_v1', sales: 'loja_sales_v1' };
+  const CREDENTIALS = { user: 'admin', pass: 'Loja@123' };
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function loadData(key){ const raw = localStorage.getItem(key); try{ return raw ? JSON.parse(raw) : []; }catch(e){ console.warn('parse error', key); return []; } }
+  function saveData(key, data){ localStorage.setItem(key, JSON.stringify(data)); }
+  function saveGastos(gastos){ localStorage.setItem('loja_gastos_v1', JSON.stringify(gastos)); }
+  function saveCustosVendidos(v){ localStorage.setItem('loja_custos_vendidos_v1', String(v)); }
+  function moneyFmt(n){ return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function moneyLabel(n){ return 'R$ ' + moneyFmt(n||0); }
+
+  let stock = loadData(STORAGE_KEYS.stock);
+  let sales = loadData(STORAGE_KEYS.sales);
+  let gastos = JSON.parse(localStorage.getItem('loja_gastos_v1') || '[]');
+  let custosProdutosVendidos = Number(localStorage.getItem('loja_custos_vendidos_v1') || 0);
+  let currentUser = null;
+  let grafPizza = null;
+
+  // DOM refs
+  const loginPage = document.getElementById('login-page');
+  const loginBtn = document.getElementById('loginBtn');
+  const demoBtn = document.getElementById('demoBtn');
+  const loginUser = document.getElementById('loginUser');
+  const loginPass = document.getElementById('loginPass');
+  const remember = document.getElementById('remember');
+
+  const appRoot = document.getElementById('app-root');
+  const navButtons = document.querySelectorAll('.nav button[data-page]');
+  const pageDashboard = document.getElementById('page-dashboard');
+  const pageEstoque = document.getElementById('page-estoque');
+  const pageVendas = document.getElementById('page-vendas');
+  const pageRelatorios = document.getElementById('page-relatorios');
+  const currentUserEl = document.getElementById('currentUser');
+
+  const exportStockBtnSide = document.getElementById('exportStockBtnSide');
+  const exportSalesBtnSide = document.getElementById('exportSalesBtnSide');
+  const clearBtnSide = document.getElementById('clearBtnSide');
+  const globalSearch = document.getElementById('globalSearch');
+  const newProductBtn = document.getElementById('newProductBtn');
+  const newProductBtn2 = document.getElementById('newProductBtn2');
+
+  const totalPecasEl = document.getElementById('totalPecas');
+  const totalInvestidoEl = document.getElementById('totalInvestido');
+  const faturamentoRealEl = document.getElementById('faturamentoReal');
+  const lucroRealEl = document.getElementById('lucroReal');
+  const rankingProdutosEl = document.getElementById('rankingProdutos');
+  const resumoPizzaEl = document.getElementById('resumoPizza');
+
+  const quickProduto = document.getElementById('quickProduto');
+  const quickQtd = document.getElementById('quickQtd');
+  const quickValor = document.getElementById('quickValor');
+  const quickAddBtn = document.getElementById('quickAddBtn');
+
+  const stockTableBody = document.querySelector('#stockTable tbody');
+  const filterStock = document.getElementById('filterStock');
+  const filterTamanho = document.getElementById('filterTamanho');
+
+  const salesTableBody = document.querySelector('#salesTable tbody');
+  const filterSales = document.getElementById('filterSales');
+  const filterEstorno = document.getElementById('filterEstorno');
+
+  const gastoFormSide = document.getElementById('gastoFormSide');
+  const gastoDescSide = document.getElementById('gastoDescSide');
+  const gastoValorSide = document.getElementById('gastoValorSide');
+
+  const modalRoot = document.getElementById('modal-root');
+
+  // chart plugin (center text)
+  const centerTextPlugin = {
+    id: 'centerTextPlugin',
+    afterDraw(chart, args, options) {
+      const {ctx, chartArea: {left, right, top, bottom}} = chart;
+      ctx.save();
+      const centerX = (left + right) / 2;
+      const centerY = (top + bottom) / 2;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = options.color || '#f0f4f8';
+      ctx.font = `700 14px Inter, system-ui`;
+      ctx.fillText(options.title || '', centerX, centerY - 8);
+      ctx.font = `800 18px Inter, system-ui`;
+      ctx.fillText(options.value || '', centerX, centerY + 18);
+      ctx.restore();
+    }
+  };
+  Chart.register(centerTextPlugin);
+
+  // AUTH
+  function showApp(user){
+    currentUser = user;
+    currentUserEl.textContent = user;
+    loginPage.style.display = 'none';
+    appRoot.style.display = 'grid';
+    renderAll();
+  }
+
+  loginBtn.addEventListener('click', ()=>{
+    const u = loginUser.value.trim();
+    const p = loginPass.value;
+    if(u === CREDENTIALS.user && p === CREDENTIALS.pass){
+      showApp(u);
+      if(remember.checked) localStorage.setItem('loja_last_user', u);
+    } else {
+      alert('Usuário ou senha incorretos.');
+    }
+  });
+  demoBtn.addEventListener('click', ()=>{ loginUser.value = CREDENTIALS.user; loginPass.value = CREDENTIALS.pass; loginBtn.click(); });
+
+  if(localStorage.getItem('loja_last_user') === CREDENTIALS.user){
+    loginUser.value = CREDENTIALS.user;
+    loginPass.value = CREDENTIALS.pass;
+    showApp(CREDENTIALS.user);
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{ if(confirm('Encerrar sessão?')){ currentUser = null; appRoot.style.display='none'; loginPage.style.display='flex'; } });
+
+  // NAV
+  navButtons.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      navButtons.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      showPage(btn.dataset.page);
+    });
+  });
+  function showPage(page){
+    pageDashboard.style.display = page === 'dashboard' ? '' : 'none';
+    pageEstoque.style.display = page === 'estoque' ? '' : 'none';
+    pageVendas.style.display = page === 'vendas' ? '' : 'none';
+    pageRelatorios.style.display = page === 'relatorios' ? '' : 'none';
+  }
+
+  // RENDER HELPERS
+  function buildProductOptionList(){
+    const selects = [quickProduto, document.getElementById('carrinhoProduto')].filter(Boolean);
+    selects.forEach(s=>{
+      s.innerHTML = '';
+      stock.filter(it => Number(it.qtd) > 0).forEach(it=>{
+        const opt = document.createElement('option');
+        opt.value = it.id;
+        opt.textContent = `${it.modelo} — ${it.cor} — ${it.tamanho} (qtd: ${it.qtd})`;
+        s.appendChild(opt);
+      });
+    });
+  }
+
+  function renderStock(){
+    stockTableBody.innerHTML = '';
+    const q = (filterStock.value||'').toLowerCase();
+    const t = filterTamanho.value;
+    const list = stock.filter(it=>{
+      if(t && it.tamanho !== t) return false;
+      if(!q) return true;
+      return [it.modelo, it.cor, it.tamanho].join(' ').toLowerCase().includes(q);
+    });
+    if(list.length === 0){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="8" class="muted">Nenhum item no estoque.</td>`;
+      stockTableBody.appendChild(tr);
+      return;
+    }
+    list.forEach(item=>{
+      const lucroUnit = Number(item.preco) - Number(item.custo);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${item.modelo}</td>
+        <td>${item.cor}</td>
+        <td>${item.tamanho}</td>
+        <td><input class="inline-qtd" data-id="${item.id}" type="number" min="0" value="${item.qtd}" style="width:80px;padding:6px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--white)"></td>
+        <td>${moneyLabel(item.custo)}</td>
+        <td>${moneyLabel(item.preco)}</td>
+        <td>${moneyLabel(lucroUnit)}</td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost btn-edit" data-id="${item.id}">Editar</button>
+          <button class="btn ghost btn-remove" data-id="${item.id}">Remover</button>
+        </td>`;
+      stockTableBody.appendChild(tr);
+    });
+
+    // attach listeners
+    document.querySelectorAll('.inline-qtd').forEach(inp=>{
+      inp.addEventListener('change', (e)=>{
+        const id = e.target.dataset.id;
+        const val = Number(e.target.value) || 0;
+        const idx = stock.findIndex(s=>s.id===id);
+        if(idx>=0){ stock[idx].qtd = val; saveData(STORAGE_KEYS.stock, stock); renderAll(); }
+      });
+    });
+    document.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click', (e)=> openProductModal(b.dataset.id)));
+    document.querySelectorAll('.btn-remove').forEach(b=>b.addEventListener('click', (e)=>{
+      const id = b.dataset.id;
+      if(!confirm('Remover item do estoque? Esta ação é permanente.')) return;
+      stock = stock.filter(s=>s.id!==id);
+      saveData(STORAGE_KEYS.stock, stock);
+      renderAll();
+    }));
+    buildProductOptionList();
+  }
+
+  function renderSales(){
+    salesTableBody.innerHTML = '';
+    const q = (filterSales.value||'').toLowerCase();
+    const est = filterEstorno.value;
+    const list = sales.slice().reverse().filter(s=>{
+      if(est === 'active' && s.estornado) return false;
+      if(est === 'estornado' && !s.estornado) return false;
+      if(!q) return true;
+      return (s.nome + ' ' + (s.date || '')).toLowerCase().includes(q);
+    });
+    if(list.length === 0){
+      salesTableBody.innerHTML = `<tr><td colspan="6" class="muted">Nenhuma venda registrada.</td></tr>`;
+      return;
+    }
+    list.forEach(s=>{
+      const estClass = s.estornado ? 'color:var(--muted);opacity:0.6;text-decoration:line-through' : '';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="${estClass}">${new Date(s.date).toLocaleString()}</td>
+        <td style="${estClass}">${s.nome}</td>
+        <td style="${estClass}">${s.qtd}</td>
+        <td style="${estClass}">${moneyLabel(s.valorTotal)}</td>
+        <td style="${estClass}">${moneyLabel(s.lucro)}</td>
+        <td style="white-space:nowrap">
+          <button class="btn ghost btn-toggle-estorno" data-id="${s.id}" style="min-width:110px">${s.estornado ? 'Reaplicar' : 'Estornar'}</button>
+        </td>`;
+      salesTableBody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.btn-toggle-estorno').forEach(b=>{
+      b.addEventListener('click', ()=> toggleEstorno(b.dataset.id));
+    });
+  }
+
+  function calcularResumo(){
+    const totalPecas = stock.reduce((a,b)=>a + Number(b.qtd), 0);
+    const totalInvestido = stock.reduce((a,b)=>a + (Number(b.custo) * Number(b.qtd)), 0);
+    const faturamentoReal = sales.filter(s=>!s.estornado).reduce((a,b)=>a + Number(b.valorTotal), 0);
+    const lucroReal = sales.filter(s=>!s.estornado).reduce((a,b)=>a + Number(b.lucro), 0);
+    const totalGastos = gastos.reduce((a,b)=>a + Number(b.valor), 0);
+
+    totalPecasEl.textContent = totalPecas;
+    totalInvestidoEl.textContent = moneyLabel(totalInvestido);
+    faturamentoRealEl.textContent = moneyLabel(faturamentoReal);
+    lucroRealEl.textContent = moneyLabel(lucroReal);
+
+    document.getElementById('rel_faturamento').textContent = moneyLabel(faturamentoReal);
+    document.getElementById('rel_gastos').textContent = moneyLabel(totalGastos);
+    document.getElementById('rel_custos').textContent = moneyLabel(custosProdutosVendidos);
+    document.getElementById('rel_lucro').textContent = moneyLabel(faturamentoReal - custosProdutosVendidos - totalGastos);
+  }
+
+  function atualizarPizza(){
+    const faturamento = sales.filter(s=>!s.estornado).reduce((a,b)=>a + Number(b.valorTotal), 0);
+    const custoProdutos = custosProdutosVendidos;
+    const gastosExtras = gastos.reduce((a,b)=>a + Number(b.valor), 0);
+    const lucroLiquido = faturamento - custoProdutos - gastosExtras;
+    const canvas = document.getElementById("grafPizza");
+    const ctx = canvas.getContext("2d");
+
+    const g1 = ctx.createLinearGradient(0,0,0,200); g1.addColorStop(0, '#5eead4'); g1.addColorStop(1, '#10b981');
+    const g2 = ctx.createLinearGradient(0,0,0,200); g2.addColorStop(0, '#fca5a5'); g2.addColorStop(1, '#ef4444');
+    const g3 = ctx.createLinearGradient(0,0,0,200); g3.addColorStop(0, '#fef3c7'); g3.addColorStop(1, '#f59e0b');
+    const g4pos = ctx.createLinearGradient(0,0,0,200); g4pos.addColorStop(0, '#93c5fd'); g4pos.addColorStop(1, '#3b82f6');
+    const g4neg = ctx.createLinearGradient(0,0,0,200); g4neg.addColorStop(0, '#fca5a5'); g4neg.addColorStop(1, '#ef4444');
+    const lucroColor = lucroLiquido >= 0 ? g4pos : g4neg;
+
+    const values = [faturamento, custoProdutos, gastosExtras, Math.abs(lucroLiquido)];
+    const total = values.reduce((a,b)=>a+b,0);
+    const displayValues = total === 0 ? [1,0,0,0] : values;
+
+    if(grafPizza) grafPizza.destroy();
+    grafPizza = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Faturamento', 'Custo Produtos', 'Gastos Extras', lucroLiquido >= 0 ? 'Lucro Líquido' : 'Prejuízo'],
+        datasets: [{ data: displayValues, backgroundColor: [g1,g2,g3,lucroColor], borderColor:'#071022', borderWidth:2 }]
+      },
+      options: {
+        cutout:'62%', responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend:{position:'bottom', labels:{color:'#e6eef6'}},
+          centerTextPlugin: { title: lucroLiquido >= 0 ? 'Lucro líquido' : 'Prejuízo', value: `R$ ${moneyFmt(Math.abs(lucroLiquido))}`, color: lucroLiquido >= 0 ? '#10b981' : '#ef4444' }
+        }
+      }
+    });
+
+    resumoPizzaEl.innerHTML = `<div class="small muted"><strong>Faturamento:</strong> ${moneyLabel(faturamento)} — <strong>Custo vendido:</strong> ${moneyLabel(custoProdutos)} — <strong>Gastos:</strong> ${moneyLabel(gastosExtras)} — <strong>Lucro líquido:</strong> ${moneyLabel(lucroLiquido)}</div>`;
+  }
+
+  function atualizarRanking(){
+    const contagem = {};
+    sales.filter(s=>!s.estornado).forEach(s=>{ contagem[s.nome] = (contagem[s.nome]||0) + Number(s.qtd); });
+    const lista = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    rankingProdutosEl.innerHTML = '';
+    if(lista.length===0){ rankingProdutosEl.innerHTML = '<li class="muted">Nenhuma venda registrada ainda.</li>'; return; }
+    lista.forEach(([nome,qtd])=>{ const li = document.createElement('li'); li.textContent = `${nome} — ${qtd} vendidos`; rankingProdutosEl.appendChild(li); });
+  }
+
+  function renderAll(){
+    renderStock();
+    renderSales();
+    calcularResumo();
+    atualizarPizza();
+    atualizarRanking();
+    buildProductOptionList();
+  }
+
+  // MODAL product
+  function openProductModal(productId){
+    modalRoot.innerHTML = '';
+    const backdrop = document.createElement('div'); backdrop.className = 'modal-backdrop';
+    const modal = document.createElement('div'); modal.className = 'modal';
+    const isEdit = !!productId;
+    const product = isEdit ? stock.find(s=>s.id===productId) : null;
+
+    modal.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="margin:0">${isEdit ? 'Editar produto' : 'Novo produto'}</h3>
+        <button class="btn ghost" id="closeModal">Fechar</button>
+      </div>
+      <form id="productForm" style="display:flex;flex-direction:column;gap:8px">
+        <div class="form-row">
+          <div class="col"><label class="small muted">Modelo</label><input id="m_modelo" required /></div>
+          <div class="col"><label class="small muted">Cor</label><input id="m_cor" required /></div>
+        </div>
+        <div class="form-row">
+          <div class="col"><label class="small muted">Tamanho</label><select id="m_tamanho"><option>M</option><option>G</option><option>GG</option></select></div>
+          <div class="col"><label class="small muted">Quantidade</label><input id="m_qtd" type="number" min="0" value="1" /></div>
+        </div>
+        <div class="form-row">
+          <div class="col"><label class="small muted">Custo unit (R$)</label><input id="m_custo" type="number" min="0" step="0.01" /></div>
+          <div class="col"><label class="small muted">Preço venda (R$)</label><input id="m_preco" type="number" min="0" step="0.01" /></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+          ${isEdit ? `<button type="button" class="btn ghost" id="deleteProduct">Remover</button>` : ''}
+          <button type="submit" class="btn">${isEdit ? 'Salvar alterações' : 'Adicionar produto'}</button>
+        </div>
+      </form>`;
+
+    backdrop.appendChild(modal);
+    modalRoot.appendChild(backdrop);
+    modalRoot.style.display = 'block';
+
+    if(isEdit && product){
+      document.getElementById('m_modelo').value = product.modelo;
+      document.getElementById('m_cor').value = product.cor;
+      document.getElementById('m_tamanho').value = product.tamanho;
+      document.getElementById('m_qtd').value = product.qtd;
+      document.getElementById('m_custo').value = product.custo;
+      document.getElementById('m_preco').value = product.preco;
+    }
+
+    document.getElementById('closeModal').addEventListener('click', closeModal);
+    backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
+
+    document.getElementById('productForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const novo = {
+        id: isEdit ? productId : uid(),
+        modelo: document.getElementById('m_modelo').value.trim(),
+        cor: document.getElementById('m_cor').value.trim(),
+        tamanho: document.getElementById('m_tamanho').value,
+        qtd: Number(document.getElementById('m_qtd').value) || 0,
+        custo: Number(document.getElementById('m_custo').value) || 0,
+        preco: Number(document.getElementById('m_preco').value) || 0
+      };
+      if(isEdit){
+        const idx = stock.findIndex(s=>s.id===productId);
+        if(idx>=0) stock[idx] = novo;
+      } else {
+        stock.push(novo);
+        const invest = { id: uid(), date: new Date().toISOString(), desc: `Investimento: ${novo.modelo}`, valor: Number(novo.custo) * Number(novo.qtd) };
+        gastos.push(invest);
+        saveGastos(gastos);
+      }
+      saveData(STORAGE_KEYS.stock, stock);
+      renderAll();
+      closeModal();
+    });
+
+    if(isEdit){
+      document.getElementById('deleteProduct').addEventListener('click', ()=>{
+        if(!confirm('Remover este produto do estoque?')) return;
+        stock = stock.filter(s=>s.id !== productId);
+        saveData(STORAGE_KEYS.stock, stock);
+        renderAll();
+        closeModal();
+      });
+    }
+
+    function closeModal(){ modalRoot.innerHTML = ''; modalRoot.style.display = 'none'; }
+  }
+
+  // ESTORNO
+  function toggleEstorno(saleId){
+    const idx = sales.findIndex(s=>s.id === saleId);
+    if(idx < 0) return;
+    const sale = sales[idx];
+    if(!sale.estornado){
+      let prodIdx = stock.findIndex(s=>s.id === sale.productId);
+      if(prodIdx === -1){
+        const parts = sale.nome.split(' — ');
+        const modelo = parts[0] || sale.nome;
+        const cor = parts[1] || '';
+        const tamanho = parts[2] || '';
+        stock.push({ id: sale.productId || uid(), modelo, cor, tamanho, custo: sale.custoUnit || (sale.custoTotal / sale.qtd || 0), preco: sale.valorUnit || (sale.valorTotal / sale.qtd || 0), qtd: 0 });
+        prodIdx = stock.findIndex(s=>s.id === (sale.productId || uid()));
+      }
+      stock[prodIdx].qtd = Number(stock[prodIdx].qtd) + Number(sale.qtd);
+      custosProdutosVendidos = Math.max(0, Number(custosProdutosVendidos) - Number(sale.custoTotal || (sale.custoUnit * sale.qtd || 0)));
+      sale.estornado = true;
+      saveCustosVendidos(custosProdutosVendidos);
+      saveData(STORAGE_KEYS.sales, sales);
+      saveData(STORAGE_KEYS.stock, stock);
+      renderAll();
+      alert('Venda estornada: estoque reestabelecido.');
+    } else {
+      const prodIdx = stock.findIndex(s=>s.id === sale.productId);
+      if(prodIdx === -1 || Number(stock[prodIdx].qtd) < Number(sale.qtd)){
+        return alert('Não é possível reaplicar: estoque insuficiente.');
+      }
+      stock[prodIdx].qtd = Number(stock[prodIdx].qtd) - Number(sale.qtd);
+      if(stock[prodIdx].qtd <= 0) stock.splice(prodIdx,1);
+      custosProdutosVendidos = Number(custosProdutosVendidos) + Number(sale.custoTotal || (sale.custoUnit * sale.qtd || 0));
+      sale.estornado = false;
+      saveCustosVendidos(custosProdutosVendidos);
+      saveData(STORAGE_KEYS.sales, sales);
+      saveData(STORAGE_KEYS.stock, stock);
+      renderAll();
+      alert('Venda reaplicada: estoque reduzido novamente.');
+    }
+  }
+
+  // QUICK SALE
+  quickAddBtn?.addEventListener('click', ()=>{
+    const pid = quickProduto.value;
+    if(!pid) return alert('Selecione um produto.');
+    const produto = stock.find(s=>s.id===pid);
+    if(!produto) return alert('Produto não encontrado.');
+    const qtd = Number(quickQtd.value) || 1;
+    if(qtd > Number(produto.qtd)) return alert('Quantidade maior que estoque disponível.');
+    const valorUnit = Number(quickValor.value) || Number(produto.preco);
+    const now = new Date().toISOString();
+    const valorTotal = Number(valorUnit) * Number(qtd);
+    const lucro = (Number(valorUnit) - Number(produto.custo)) * Number(qtd);
+    const sale = { id: uid(), date: now, nome: produto.modelo + ' — ' + produto.cor + ' — ' + produto.tamanho, qtd, valorTotal, lucro, productId: produto.id, custoUnit: Number(produto.custo), custoTotal: Number(produto.custo) * Number(qtd), valorUnit, estornado:false };
+    sales.push(sale);
+    const idx = stock.findIndex(s=>s.id===produto.id);
+    if(idx>=0){
+      stock[idx].qtd = Number(stock[idx].qtd) - Number(qtd);
+      if(stock[idx].qtd <= 0) stock.splice(idx,1);
+    }
+    custosProdutosVendidos += Number(produto.custo) * Number(qtd);
+    saveCustosVendidos(custosProdutosVendidos);
+    saveData(STORAGE_KEYS.sales, sales);
+    saveData(STORAGE_KEYS.stock, stock);
+    renderAll();
+    alert(`Venda registrada: ${qtd} x ${produto.modelo} — Total: ${moneyLabel(valorTotal)}`);
+  });
+
+  // GASTOS
+  gastoFormSide?.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const desc = gastoDescSide.value.trim();
+    const val = Number(gastoValorSide.value) || 0;
+    if(!desc || val <= 0) return alert('Informe descrição e valor.');
+    gastos.push({ id: uid(), date: new Date().toISOString(), desc, valor: val });
+    saveGastos(gastos);
+    gastoFormSide.reset();
+    renderAll();
+  });
+
+  // EXPORT / RESET
+  function toCSV(rows, headers){
+    const lines = [headers.join(',')];
+    rows.forEach(r=>{ lines.push(headers.map(h=>`"${String(r[h] ?? '')}"`).join(',')); });
+    return lines.join('\n');
+  }
+  function download(filename, blob){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+  function exportStockCSV(){ if(stock.length===0) return alert('Estoque vazio.'); const headers = ['id','modelo','cor','tamanho','qtd','custo','preco']; const csv = toCSV(stock, headers); download('estoque.csv', new Blob([csv], {type:'text/csv'})); }
+  function exportSalesCSV(){ if(sales.length===0) return alert('Sem vendas.'); const headers = ['id','date','nome','productId','qtd','valorUnit','valorTotal','custoTotal','lucro','estornado']; const csv = toCSV(sales, headers); download('vendas.csv', new Blob([csv], {type:'text/csv'})); }
+
+  exportStockBtnSide?.addEventListener('click', exportStockCSV);
+  exportSalesBtnSide?.addEventListener('click', exportSalesCSV);
+  document.getElementById('exportSalesBtnTop')?.addEventListener('click', exportSalesCSV);
+
+  clearBtnSide?.addEventListener('click', ()=>{
+    if(!confirm('Resetar vendas, gastos e custos vendidos? Isso NÃO irá deletar o estoque atual.')) return;
+    sales = []; gastos = []; custosProdutosVendidos = 0;
+    saveData(STORAGE_KEYS.sales, sales);
+    saveGastos(gastos);
+    saveCustosVendidos(custosProdutosVendidos);
+    renderAll();
+    alert('Vendas e gastos resetados (estoque mantido).');
+  });
+
+  // FILTERS / SEARCH
+  globalSearch?.addEventListener('input', (e)=>{
+    const q = (e.target.value||'').toLowerCase();
+    if(pageEstoque.style.display !== 'none') filterStock.value = q;
+    if(pageVendas.style.display !== 'none') filterSales.value = q;
+    renderAll();
+  });
+  filterStock?.addEventListener('input', renderStock);
+  filterTamanho?.addEventListener('change', renderStock);
+  filterSales?.addEventListener('input', renderSales);
+  filterEstorno?.addEventListener('change', renderSales);
+
+  // New product
+  newProductBtn?.addEventListener('click', ()=> openProductModal());
+  newProductBtn2?.addEventListener('click', ()=> openProductModal());
+
+  function attachSimpleListeners(){
+    document.getElementById('exportStockBtn')?.addEventListener('click', exportStockCSV);
+    document.getElementById('exportSalesBtn')?.addEventListener('click', exportSalesCSV);
+    document.getElementById('quickProduto') && buildProductOptionList();
+  }
+
+  function normalizeSales(){
+    let changed = false;
+    sales = sales.map(s=>{
+      if(!s.id) s.id = uid(), changed = true;
+      if(!('estornado' in s)) s.estornado = false, changed = true;
+      if(!('productId' in s)) s.productId = s.productId || null;
+      if(!('custoTotal' in s)) s.custoTotal = s.custoTotal || (s.custoUnit ? s.custoUnit * s.qtd : 0);
+      if(!('valorUnit' in s)) s.valorUnit = s.valorUnit || (s.qtd ? s.valorTotal / s.qtd : 0);
+      return s;
+    });
+    if(changed) saveData(STORAGE_KEYS.sales, sales);
+  }
+
+  normalizeSales();
+  attachSimpleListeners();
+  if(appRoot.style.display !== 'grid') loginPage.style.display = 'flex';
+  window.renderAll = renderAll;
+  if(appRoot.style.display === 'grid'){ renderAll(); }
+
+  window.addEventListener('beforeunload', ()=>{
+    saveData(STORAGE_KEYS.stock, stock);
+    saveData(STORAGE_KEYS.sales, sales);
+    saveGastos(gastos);
+    saveCustosVendidos(custosProdutosVendidos);
+  });
+  </script>
+</body>
+</html>
