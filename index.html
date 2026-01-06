@@ -108,7 +108,7 @@ select option, select optgroup{background:#1a1625;color:var(--white);}
             <button class="btn" id="loginBtn">Entrar</button>
           </div>
         </div>
-        <div class="help-text" style="margin-top:8px;color:var(--muted)">Credenciais padrão: <strong>jplupas</strong> / <strong>1234@</strong></div>
+        
       </div>
     </div>
   </div>
@@ -327,7 +327,7 @@ select option, select optgroup{background:#1a1625;color:var(--white);}
    * Unified Inventory App (final)
    ***************************/
   const STORAGE_KEYS = { stock: 'loja_stock_v1', sales: 'loja_sales_v1' };
-  const CREDENTIALS = { user: 'admin', pass: 'Loja@123' };
+  const CREDENTIALS = { user: 'jplupas', pass: '1234@' };
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
   function loadData(key){ const raw = localStorage.getItem(key); try{ return raw ? JSON.parse(raw) : []; }catch(e){ console.warn('parse error', key); return []; } }
