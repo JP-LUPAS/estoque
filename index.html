@@ -566,8 +566,9 @@ select option, select optgroup{background:#1a1625;color:var(--white);}
     const totalPecas = stock.reduce((a,b)=>a + Number(b.qtd), 0);
     const totalInvestido = stock.reduce((a,b)=>a + (Number(b.custo) * Number(b.qtd)), 0);
     const faturamentoReal = sales.filter(s=>!s.estornado).reduce((a,b)=>a + Number(b.valorTotal), 0);
-    const lucroReal = sales.filter(s=>!s.estornado).reduce((a,b)=>a + Number(b.lucro), 0);
+    const lucroVendas = sales.filter(s=>!s.estornado).reduce((a,b)=>a + Number(b.lucro), 0);
     const totalGastos = gastos.reduce((a,b)=>a + Number(b.valor), 0);
+    const lucroReal = faturamentoReal - custosProdutosVendidos - totalGastos; // ✅ CÁLCULO CORRETO
 
     totalPecasEl.textContent = totalPecas;
     totalInvestidoEl.textContent = moneyLabel(totalInvestido);
